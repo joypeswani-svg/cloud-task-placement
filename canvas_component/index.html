@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Logisim Cloud Canvas</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    html, body {
+      background-color: #050608;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 660px;
+      border: 1px solid #1c2230;
+      border-radius: 8px;
+      background: #050608;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Fullscreen Mode (Persists across edits, zero-jitter overlay) */
+    #app.is-fullscreen {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 99999999 !important;
+      border: none !important;
+      border-radius: 0 !important;
+      background: #050608 !important;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: #090b10;
+      border-bottom: 1px solid #191f2b;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tool-btn {
+      background: #11141c;
+      border: 1px solid #232b3b;
+      color: #94a3b8;
+      padding: 6px 11px;
+      border-radius: 6px;
+      font-size: 0.81rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .tool-btn:hover {
+      background: #181d28;
+      border-color: #3b455b;
+      color: #f1f5f9;
+    }
+    .tool-btn.active {
+      background: #8b0000 !important;
+      border-color: #dc2626 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+    }
+    .btn-fs {
+      background: #1a1625;
+      border-color: #4338ca;
+      color: #c7d2fe;
+    }
+    .btn-fs:hover {
+      background: #312e81;
+      border-color: #6366f1;
+      color: #ffffff;
+    }
+    .btn-fs.active {
+      background: #4c0519 !important;
+      border-color: #e11d48 !important;
+      color: #fff !important;
+    }
+    .zoom-btn {
+      padding: 5px 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: #0f121a;
+      border-color: #1f2737;
+    }
+    .zoom-text {
+      font-size: 0.76rem;
+      font-family: monospace;
+      color: #cbd5e1;
+      min-width: 44px;
+      text-align: center;
+    }
+    .divider {
+      width: 1px;
+      height: 20px;
+      background: #1e2533;
+      margin: 0 3px;
+    }
+    .badge-stat {
+      font-size: 0.76rem;
+      font-family: monospace;
+      color: #f87171;
+      background: #1a0808;
+      border: 1px solid #7f1d1d;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    /* Canvas */
+    #canvas-container {
+      position: relative;
+      flex: 1 1 0px !important;
+      min-height: 0 !important;
+      width: 100%;
+      background: #06070a;
+      cursor: default;
+      overflow: hidden;
+    }
+    #canvas-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Statusbar */
+    .statusbar {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 14px;
+      background: #08090d;
+      border-top: 1px solid #161b24;
+      font-size: 0.78rem;
+      color: #64748b;
+    }
+    .status-hint {
+      color: #94a3b8;
+    }
+    .status-hint b {
+      color: #fca5a5;
+    }
+
+    /* Nodes */
+    .server-node {
+      cursor: grab;
+      transition: filter 0.15s ease;
+    }
+    .server-node:active {
+      cursor: grabbing;
+    }
+    .server-node.selected rect.chip-bg {
+      stroke: #ef4444 !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
+    }
+    .server-node.wire-source rect.chip-bg {
+      stroke: #f59e0b !important;
+      stroke-width: 3px !important;
+      stroke-dasharray: 5, 3;
+      filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.7));
+    }
+    .pin-dot {
+      fill: #ef4444;
+      stroke: #050608;
+      stroke-width: 1.5;
+      opacity: 0.6;
+      transition: all 0.2s;
+    }
+    .server-node:hover .pin-dot {
+      opacity: 1;
+      transform: scale(1.3);
+    }
+
+    /* Links */
+    .link-line {
+      stroke: #3f3f46;
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      cursor: pointer;
+      transition: stroke 0.15s, stroke-width 0.15s;
+    }
+    .link-line:hover {
+      stroke: #ef4444;
+      stroke-width: 4;
+    }
+    .link-badge {
+      cursor: pointer;
+    }
+    .link-badge rect {
+      fill: #0d0f14;
+      stroke: #27272a;
+      stroke-width: 1;
+      rx: 4;
+    }
+    .link-badge:hover rect {
+      stroke: #ef4444;
+      fill: #1a0808;
+    }
+    .link-badge text {
+      fill: #f87171;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    /* Rubberband Wire */
+    #temp-wire {
+      stroke: #f59e0b;
+      stroke-width: 2.5;
+      stroke-dasharray: 6, 4;
+      pointer-events: none;
+    }
+
+    /* Modal / Popover */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(5, 6, 8, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-box {
+      background: #0d1017;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      padding: 16px 20px;
+      width: 280px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+    .modal-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .modal-field {
+      margin-bottom: 10px;
+    }
+    .modal-field label {
+      display: block;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .modal-input {
+      width: 100%;
+      background: #06070a;
+      border: 1px solid #27272a;
+      border-radius: 4px;
+      color: #f1f5f9;
+      padding: 6px 8px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .modal-input:focus {
+      border-color: #ef4444;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .btn-cancel {
+      background: #181d28;
+      border: 1px solid #27272a;
+      color: #94a3b8;
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-save {
+      background: #8b0000;
+      border: 1px solid #dc2626;
+      color: #fff;
+      padding: 5px 14px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-del {
+      background: #3f1010;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      margin-right: auto;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="tool-group">
+      <button class="tool-btn active" id="btn-move" title="Select & Drag Nodes, or Drag Background to Pan (V)">
+        <span>🖱️ Move & Pan</span>
+      </button>
+      <button class="tool-btn" id="btn-add-server" title="Click Canvas to Place Server (A)">
+        <span>➕ Add Server</span>
+      </button>
+      <button class="tool-btn" id="btn-wire" title="Connect Links (W): Click Server A, then Server B">
+        <span>🔗 Wire (Link)</span>
+      </button>
+      <button class="tool-btn" id="btn-delete" title="Delete Clicked Node or Wire (D)">
+        <span>✂️ Delete</span>
+      </button>
+      <button class="tool-btn" id="btn-edit" title="Edit Server Name & Capacity (E)">
+        <span>✏️ Edit</span>
+      </button>
+    </div>
+
+    <div class="tool-group">
+      <div class="divider"></div>
+      <button class="tool-btn" id="btn-pre-cities" title="Load 10 Cities Cloud Preset">
+        <span>🏙️ 10 Cities</span>
+      </button>
+      <button class="tool-btn" id="btn-pre-triangle" title="Load 3-node Triangle">
+        <span>🔺 Triangle</span>
+      </button>
+      <button class="tool-btn" id="btn-pre-ring" title="Load 5-node Ring">
+        <span>🔄 Ring</span>
+      </button>
+      <button class="tool-btn" id="btn-clear" title="Clear Canvas" style="color: #ef4444;">
+        <span>🧹 Clear</span>
+      </button>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div class="tool-group">
+      <div class="divider"></div>
+      <button class="tool-btn zoom-btn" id="btn-zoom-out" title="Zoom Out (-)">
+        <span>➖</span>
+      </button>
+      <span class="zoom-text" id="zoom-text">100%</span>
+      <button class="tool-btn zoom-btn" id="btn-zoom-in" title="Zoom In (+)">
+        <span>➕</span>
+      </button>
+      <button class="tool-btn zoom-btn" id="btn-zoom-reset" title="Reset Zoom to 100% & Center">
+        <span>↺ 100%</span>
+      </button>
+    </div>
+
+    <!-- Fullscreen & Counts -->
+    <div class="tool-group">
+      <div class="divider"></div>
+      <button class="tool-btn btn-fs" id="btn-fullscreen" title="Toggle Fullscreen Mode (F)">
+        <span>⛶ Fullscreen</span>
+      </button>
+      <span class="badge-stat" id="stat-counts">0 Servers • 0 Links</span>
+    </div>
+  </div>
+
+  <!-- Interactive Grid Canvas -->
+  <div id="canvas-container">
+    <svg id="canvas-svg" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <!-- Logisim Dot Grid Pattern -->
+        <pattern id="dot-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+          <circle cx="12" cy="12" r="1.1" fill="#1e2433" />
+        </pattern>
+        <!-- Pin Glow Filter -->
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      <!-- Zoom & Pan Root Viewport Group -->
+      <g id="viewport" transform="translate(0, 0) scale(1)">
+        <!-- Infinite Grid Background -->
+        <rect x="-6000" y="-6000" width="12000" height="12000" fill="url(#dot-grid)" id="grid-bg" />
+
+        <!-- Links Layer -->
+        <g id="links-layer"></g>
+
+        <!-- Rubberband Wire during wiring -->
+        <line id="temp-wire" x1="0" y1="0" x2="0" y2="0" style="display: none;" />
+
+        <!-- Nodes Layer -->
+        <g id="nodes-layer"></g>
+      </g>
+    </svg>
+
+    <!-- Modal Dialog for editing Server or Link -->
+    <div class="modal-overlay" id="edit-modal">
+      <div class="modal-box">
+        <div class="modal-title">
+          <span id="modal-title-text">Edit Server</span>
+          <span style="cursor: pointer; color: #94a3b8;" id="modal-close">&times;</span>
+        </div>
+        <div id="modal-fields"></div>
+        <div class="modal-actions">
+          <button class="btn-del" id="modal-btn-del">Delete</button>
+          <button class="btn-cancel" id="modal-btn-cancel">Cancel</button>
+          <button class="btn-save" id="modal-btn-save">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="statusbar">
+    <span class="status-hint" id="status-hint">
+      <b>Move Mode:</b> Drag servers to reposition. Drag background to pan. Scroll wheel to zoom.
+    </span>
+    <span id="fs-tip" style="color: #64748b; font-size: 0.74rem;">Scroll wheel zooms • Drag background pans • <b>F</b> toggles Fullscreen</span>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// STATE & TRANSFORM
+// =====================================================================
+
+const state = {
+  activeTool: 'move', // 'move', 'add_server', 'wire', 'delete'
+  wireStartServerId: null,
+  draggingServerId: null,
+  hasActuallyDragged: false,
+  dragOffset: { x: 0, y: 0 },
+  selectedServerId: null,
+  isPanning: false,
+  panStart: { x: 0, y: 0 },
+  isCustomFullscreen: false,
+  network: {
+    servers: [],
+    links: [],
+    clients: []
+  },
+  modalContext: null
+};
+
+// Pan & Zoom transform state
+const transform = {
+  x: 0,
+  y: 0,
+  scale: 1.0
+};
+
+// SVG & Container Elements
+const appEl = document.getElementById('app');
+const svg = document.getElementById('canvas-svg');
+const viewport = document.getElementById('viewport');
+const nodesLayer = document.getElementById('nodes-layer');
+const linksLayer = document.getElementById('links-layer');
+const tempWire = document.getElementById('temp-wire');
+const gridBg = document.getElementById('grid-bg');
+const statusHint = document.getElementById('status-hint');
+const statCounts = document.getElementById('stat-counts');
+const zoomText = document.getElementById('zoom-text');
+const btnFullscreen = document.getElementById('btn-fullscreen');
+
+// Tool Buttons
+const btnMove = document.getElementById('btn-move');
+const btnAddServer = document.getElementById('btn-add-server');
+const btnWire = document.getElementById('btn-wire');
+const btnDelete = document.getElementById('btn-delete');
+const btnEdit = document.getElementById('btn-edit');
+const toolBtns = [btnMove, btnAddServer, btnWire, btnDelete];
+
+function setTool(tool) {
+  state.activeTool = tool;
+  state.wireStartServerId = null;
+  tempWire.style.display = 'none';
+
+  toolBtns.forEach(btn => btn.classList.remove('active'));
+  if (tool === 'move') {
+    btnMove.classList.add('active');
+    statusHint.innerHTML = "<b>Move & Pan:</b> Drag servers to reposition. Drag empty background to pan. Scroll to zoom.";
+    svg.style.cursor = 'default';
+  } else if (tool === 'add_server') {
+    btnAddServer.classList.add('active');
+    statusHint.innerHTML = "<b>Add Server:</b> Click anywhere on the grid to drop a new server node.";
+    svg.style.cursor = 'crosshair';
+  } else if (tool === 'wire') {
+    btnWire.classList.add('active');
+    statusHint.innerHTML = "<b>Wire Mode:</b> Click <b>Server A</b>, then click <b>Server B</b> to connect with a link wire.";
+    svg.style.cursor = 'pointer';
+  } else if (tool === 'delete') {
+    btnDelete.classList.add('active');
+    statusHint.innerHTML = "<b>Delete Mode:</b> Click any server node or wire link to remove it.";
+    svg.style.cursor = 'not-allowed';
+  }
+  render();
+}
+
+btnMove.onclick = () => setTool('move');
+btnAddServer.onclick = () => setTool('add_server');
+btnWire.onclick = () => setTool('wire');
+btnDelete.onclick = () => setTool('delete');
+if (btnEdit) {
+  btnEdit.onclick = () => {
+    if (state.selectedServerId !== null) {
+      const s = state.network.servers.find(srv => srv.id === state.selectedServerId);
+      if (s) {
+        openServerModal(s);
+        return;
+      }
+    }
+    statusHint.innerHTML = "<b>Edit:</b> Click any server node first to select it, or double-click it directly!";
+  };
+}
+
+// =====================================================================
+// PAN & ZOOM ENGINE
+// =====================================================================
+
+function updateTransform() {
+  viewport.setAttribute('transform', `translate(${transform.x}, ${transform.y}) scale(${transform.scale})`);
+  zoomText.textContent = `${Math.round(transform.scale * 100)}%`;
+}
+
+function zoomByFactor(factor, centerClientX, centerClientY) {
+  const newScale = Math.min(3.0, Math.max(0.35, transform.scale * factor));
+  if (newScale === transform.scale) return;
+
+  const rect = svg.getBoundingClientRect();
+  const cx = centerClientX !== undefined ? centerClientX - rect.left : rect.width / 2;
+  const cy = centerClientY !== undefined ? centerClientY - rect.top : rect.height / 2;
+
+  const ratio = newScale / transform.scale;
+  transform.x = cx - (cx - transform.x) * ratio;
+  transform.y = cy - (cy - transform.y) * ratio;
+  transform.scale = newScale;
+
+  updateTransform();
+}
+
+document.getElementById('btn-zoom-in').onclick = () => zoomByFactor(1.18);
+document.getElementById('btn-zoom-out').onclick = () => zoomByFactor(0.85);
+document.getElementById('btn-zoom-reset').onclick = () => {
+  transform.x = 0;
+  transform.y = 0;
+  transform.scale = 1.0;
+  updateTransform();
+};
+
+// Mouse Wheel Zoom centered on cursor
+svg.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.09 : 0.91;
+  zoomByFactor(factor, e.clientX, e.clientY);
+}, { passive: false });
+
+// =====================================================================
+// FULLSCREEN TOGGLE (PERSISTENT & ROCK-SOLID)
+// =====================================================================
+
+function ensureParentFullscreenStyles() {
+  try {
+    if (!window.parent || !window.parent.document || !window.parent.document.head) return;
+    let styleEl = window.parent.document.getElementById('canvas-parent-fullscreen-styles');
+    if (!styleEl) {
+      styleEl = window.parent.document.createElement('style');
+      styleEl.id = 'canvas-parent-fullscreen-styles';
+      styleEl.textContent = `
+        body.canvas-fullscreen-active {
+          overflow: hidden !important;
+        }
+        body.canvas-fullscreen-active [data-stale="true"],
+        body.canvas-fullscreen-active div[data-testid="stElementContainer"],
+        body.canvas-fullscreen-active div[data-testid="stVerticalBlock"],
+        body.canvas-fullscreen-active div[data-testid="stCustomComponentV1"],
+        body.canvas-fullscreen-active div[data-testid="stTabs"],
+        body.canvas-fullscreen-active [data-testid="stTabContent"],
+        body.canvas-fullscreen-active section.main,
+        body.canvas-fullscreen-active .main,
+        body.canvas-fullscreen-active .stApp {
+          opacity: 1 !important;
+          filter: none !important;
+          transform: none !important;
+          transition: none !important;
+        }
+        body.canvas-fullscreen-active div[data-testid="stCustomComponentV1"] iframe,
+        body.canvas-fullscreen-active .stCustomComponentRoot iframe,
+        body.canvas-fullscreen-active iframe[title*="logisim"],
+        body.canvas-fullscreen-active iframe.canvas-fullscreen-frame,
+        body.canvas-fullscreen-active iframe {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          z-index: 2147483647 !important;
+          border: none !important;
+          background: #050608 !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+        }
+      `;
+      window.parent.document.head.appendChild(styleEl);
+    }
+  } catch (e) {}
+}
+
+function setParentIframeFullscreen(isFs) {
+  ensureParentFullscreenStyles();
+  try {
+    let frame = null;
+    try {
+      frame = window.frameElement;
+    } catch (e) {
+      frame = null;
+    }
+    if (!frame && window.parent && window.parent.document) {
+      try {
+        const iframes = window.parent.document.querySelectorAll('iframe');
+        for (const ifr of iframes) {
+          try {
+            if (ifr.contentWindow === window) {
+              frame = ifr;
+              break;
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+    }
+    if (frame) {
+      if (isFs) {
+        frame.classList.add('canvas-fullscreen-frame');
+        frame.style.setProperty('position', 'fixed', 'important');
+        frame.style.setProperty('top', '0', 'important');
+        frame.style.setProperty('left', '0', 'important');
+        frame.style.setProperty('width', '100vw', 'important');
+        frame.style.setProperty('height', '100vh', 'important');
+        frame.style.setProperty('z-index', '2147483647', 'important');
+        frame.style.setProperty('border', 'none', 'important');
+        frame.style.setProperty('background', '#050608', 'important');
+        frame.style.setProperty('visibility', 'visible', 'important');
+        frame.style.setProperty('opacity', '1', 'important');
+      } else {
+        frame.classList.remove('canvas-fullscreen-frame');
+        frame.style.removeProperty('position');
+        frame.style.removeProperty('top');
+        frame.style.removeProperty('left');
+        frame.style.removeProperty('width');
+        frame.style.removeProperty('height');
+        frame.style.removeProperty('z-index');
+        frame.style.removeProperty('border');
+        frame.style.removeProperty('background');
+        frame.style.removeProperty('visibility');
+        frame.style.removeProperty('opacity');
+      }
+    }
+    try {
+      if (window.parent && window.parent.document && window.parent.document.body) {
+        if (isFs) {
+          window.parent.document.body.classList.add('canvas-fullscreen-active');
+        } else {
+          window.parent.document.body.classList.remove('canvas-fullscreen-active');
+        }
+      }
+    } catch (e) {}
+  } catch (err) {}
+}
+
+function applyFullscreenStyles(isFs) {
+  state.isCustomFullscreen = isFs;
+  sessionStorage.setItem('canvas_fs', isFs ? 'true' : 'false');
+  setParentIframeFullscreen(isFs);
+
+  if (isFs) {
+    appEl.classList.add('is-fullscreen');
+    btnFullscreen.innerHTML = '<span>✕ Exit Fullscreen</span>';
+    btnFullscreen.classList.add('active');
+    try {
+      if (document.fullscreenEnabled && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (e) {}
+  } else {
+    appEl.classList.remove('is-fullscreen');
+    btnFullscreen.innerHTML = '<span>⛶ Fullscreen</span>';
+    btnFullscreen.classList.remove('active');
+    try {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    } catch (e) {}
+    setFrameHeight(660);
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  const isNativeFs = !!document.fullscreenElement;
+  if (!isNativeFs && state.isCustomFullscreen) {
+    applyFullscreenStyles(false);
+  }
+});
+
+function toggleFullscreen() {
+  const currentFs = state.isCustomFullscreen || appEl.classList.contains('is-fullscreen') || !!document.fullscreenElement;
+  applyFullscreenStyles(!currentFs);
+}
+
+btnFullscreen.onclick = toggleFullscreen;
+
+// Restore fullscreen from previous session if set
+if (sessionStorage.getItem('canvas_fs') === 'true') {
+  applyFullscreenStyles(true);
+}
+
+// Keyboard shortcuts (F: fullscreen, V: move, W: wire, A: add, D: delete, E: edit, Esc: cancel wire or exit FS)
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+  if (e.key === 'v' || e.key === 'V') setTool('move');
+  if (e.key === 'w' || e.key === 'W') setTool('wire');
+  if (e.key === 'a' || e.key === 'A') setTool('add_server');
+  if (e.key === 'd' || e.key === 'D') setTool('delete');
+  if (e.key === 'e' || e.key === 'E') { if (btnEdit) btnEdit.click(); }
+  if (e.key === 'Escape') {
+    if (state.wireStartServerId !== null) {
+      state.wireStartServerId = null;
+      tempWire.style.display = 'none';
+      render();
+    } else if (state.isCustomFullscreen || appEl.classList.contains('is-fullscreen')) {
+      toggleFullscreen();
+    }
+  }
+});
+
+// Presets
+document.getElementById('btn-clear').onclick = () => {
+  state.network = { servers: [], links: [], clients: [] };
+  render();
+  notifyStreamlit(true);
+};
+
+document.getElementById('btn-pre-triangle').onclick = () => {
+  state.network = {
+    servers: [
+      { id: 0, name: "Node-A", capacity: 50, x: 260, y: 150 },
+      { id: 1, name: "Node-B", capacity: 40, x: 740, y: 150 },
+      { id: 2, name: "Node-C", capacity: 60, x: 500, y: 440 }
+    ],
+    links: [
+      { u: 0, v: 1, latency: 15.0 },
+      { u: 1, v: 2, latency: 22.0 },
+      { u: 0, v: 2, latency: 18.0 }
+    ],
+    clients: [
+      { id: 0, name: "Client-1", server_id: 0, demand: 25 },
+      { id: 1, name: "Client-2", server_id: 1, demand: 30 }
+    ]
+  };
+  render();
+  notifyStreamlit(true);
+};
+
+document.getElementById('btn-pre-ring').onclick = () => {
+  const n = 5;
+  const cx = 500, cy = 280, r = 200;
+  const srvs = [];
+  const links = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+    srvs.push({
+      id: i,
+      name: `Ring-${i + 1}`,
+      capacity: 45 + (i * 5),
+      x: Math.round(cx + r * Math.cos(angle)),
+      y: Math.round(cy + r * Math.sin(angle))
+    });
+    links.push({ u: i, v: (i + 1) % n, latency: 12.0 + i * 3 });
+  }
+  state.network = {
+    servers: srvs,
+    links: links,
+    clients: [
+      { id: 0, name: "C-1", server_id: 0, demand: 20 },
+      { id: 1, name: "C-2", server_id: 2, demand: 25 }
+    ]
+  };
+  render();
+  notifyStreamlit(true);
+};
+
+document.getElementById('btn-pre-cities').onclick = () => {
+  state.network = {
+    servers: [
+      { id: 0, name: "Mumbai", capacity: 60, x: 410, y: 280 },
+      { id: 1, name: "Delhi", capacity: 55, x: 480, y: 120 },
+      { id: 2, name: "Hyderabad", capacity: 45, x: 520, y: 310 },
+      { id: 3, name: "Bangalore", capacity: 70, x: 410, y: 440 },
+      { id: 4, name: "Chennai", capacity: 50, x: 550, y: 440 },
+      { id: 5, name: "Kolkata", capacity: 40, x: 720, y: 150 },
+      { id: 6, name: "Singapore", capacity: 65, x: 800, y: 390 },
+      { id: 7, name: "Dubai", capacity: 50, x: 230, y: 280 },
+      { id: 8, name: "London", capacity: 75, x: 110, y: 110 },
+      { id: 9, name: "Frankfurt", capacity: 60, x: 240, y: 100 }
+    ],
+    links: [
+      { u: 0, v: 1, latency: 19.0 },
+      { u: 0, v: 2, latency: 14.0 },
+      { u: 0, v: 3, latency: 18.0 },
+      { u: 1, v: 5, latency: 24.0 },
+      { u: 2, v: 3, latency: 11.0 },
+      { u: 2, v: 4, latency: 12.0 },
+      { u: 3, v: 4, latency: 8.0 },
+      { u: 4, v: 5, latency: 28.0 },
+      { u: 4, v: 6, latency: 42.0 },
+      { u: 5, v: 6, latency: 55.0 },
+      { u: 0, v: 7, latency: 32.0 },
+      { u: 7, v: 8, latency: 74.0 },
+      { u: 7, v: 9, latency: 68.0 },
+      { u: 8, v: 9, latency: 12.0 }
+    ],
+    clients: [
+      { id: 0, name: "FinTech Corp", server_id: 0, demand: 35 },
+      { id: 1, name: "Retail Hub", server_id: 1, demand: 30 },
+      { id: 2, name: "Cloud SaaS", server_id: 3, demand: 40 },
+      { id: 3, name: "Logistics API", server_id: 4, demand: 25 },
+      { id: 4, name: "Streaming", server_id: 6, demand: 20 },
+      { id: 5, name: "Euro Client", server_id: 8, demand: 30 }
+    ]
+  };
+  render();
+  notifyStreamlit(true);
+};
+
+// =====================================================================
+// CANVAS RENDERING & EXACT MOUSE POINT TRANSFORMATION
+// =====================================================================
+
+/**
+ * Calculates exact SVG user coordinates relative to the zoom/pan viewport.
+ * Uses viewport.getScreenCTM().inverse() so coordinates are 100% pixel-accurate
+ * regardless of zoom level, pan position, resolution, or fullscreen mode!
+ */
+function getSVGPoint(e) {
+  try {
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = viewport.getScreenCTM();
+    if (ctm) {
+      const p = pt.matrixTransform(ctm.inverse());
+      return {
+        x: Math.round(p.x),
+        y: Math.round(p.y)
+      };
+    }
+  } catch (err) {}
+
+  // Matrix fallback
+  const rect = svg.getBoundingClientRect();
+  const screenX = ((e.clientX - rect.left) / rect.width) * 1000;
+  const screenY = ((e.clientY - rect.top) / rect.height) * 600;
+  return {
+    x: Math.round((screenX - transform.x) / transform.scale),
+    y: Math.round((screenY - transform.y) / transform.scale)
+  };
+}
+
+function updateStats() {
+  const sCount = state.network.servers.length;
+  const lCount = state.network.links.length;
+  statCounts.innerText = `${sCount} Servers • ${lCount} Links`;
+}
+
+function render() {
+  updateStats();
+  nodesLayer.innerHTML = '';
+  linksLayer.innerHTML = '';
+
+  const sMap = {};
+  state.network.servers.forEach(s => { sMap[s.id] = s; });
+
+  // Map clients to server counts
+  const clientCounts = {};
+  state.network.clients.forEach(c => {
+    clientCounts[c.server_id] = (clientCounts[c.server_id] || 0) + c.demand;
+  });
+
+  // 1. Render Links (Wires)
+  state.network.links.forEach(l => {
+    const sU = sMap[l.u];
+    const sV = sMap[l.v];
+    if (!sU || !sV) return;
+
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+    const isNeg = l.latency < 0;
+    const isDir = !!l.directed;
+
+    const hasOpposite = isDir && state.network.links.some(k => k !== l && k.u === l.v && k.v === l.u && !!k.directed);
+
+    const dx = sV.x - sU.x;
+    const dy = sV.y - sU.y;
+    const dist = Math.hypot(dx, dy) || 1;
+
+    let wireEl;
+    let badgeX, badgeY, arrowX, arrowY, arrowAngle;
+
+    if (hasOpposite) {
+      // Perpendicular unit normal pointing to the right of direction (sU -> sV)
+      const nx = -dy / dist;
+      const ny = dx / dist;
+      const curveOffset = 36;
+      const cx = (sU.x + sV.x) / 2 + nx * curveOffset;
+      const cy = (sU.y + sV.y) / 2 + ny * curveOffset;
+
+      wireEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      wireEl.setAttribute("d", `M ${sU.x} ${sU.y} Q ${cx} ${cy} ${sV.x} ${sV.y}`);
+      wireEl.setAttribute("fill", "none");
+      wireEl.setAttribute("class", "link-line");
+
+      // Midpoint on quadratic bezier for badge: B(0.5) = 0.25*P0 + 0.5*CP + 0.25*P1
+      badgeX = 0.25 * sU.x + 0.5 * cx + 0.25 * sV.x;
+      badgeY = 0.25 * sU.y + 0.5 * cy + 0.25 * sV.y;
+
+      // Position and tangent angle for arrow at t = 0.65
+      const t = 0.65;
+      arrowX = (1 - t) * (1 - t) * sU.x + 2 * (1 - t) * t * cx + t * t * sV.x;
+      arrowY = (1 - t) * (1 - t) * sU.y + 2 * (1 - t) * t * cy + t * t * sV.y;
+      const tanX = 2 * (1 - t) * (cx - sU.x) + 2 * t * (sV.x - cx);
+      const tanY = 2 * (1 - t) * (cy - sU.y) + 2 * t * (sV.y - cy);
+      arrowAngle = Math.atan2(tanY, tanX) * (180 / Math.PI);
+    } else {
+      wireEl = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      wireEl.setAttribute("x1", sU.x);
+      wireEl.setAttribute("y1", sU.y);
+      wireEl.setAttribute("x2", sV.x);
+      wireEl.setAttribute("y2", sV.y);
+      wireEl.setAttribute("class", "link-line");
+
+      badgeX = (sU.x + sV.x) / 2;
+      badgeY = (sU.y + sV.y) / 2;
+      arrowX = sU.x + 0.68 * dx;
+      arrowY = sU.y + 0.68 * dy;
+      arrowAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+    }
+
+    if (isNeg) {
+      wireEl.setAttribute("stroke", "#ef4444");
+      wireEl.setAttribute("stroke-dasharray", "5,3");
+    }
+
+    wireEl.onclick = (e) => {
+      e.stopPropagation();
+      if (state.activeTool === 'delete') {
+        state.network.links = state.network.links.filter(k => k !== l);
+        render();
+        notifyStreamlit();
+      } else {
+        openLinkModal(l);
+      }
+    };
+    g.appendChild(wireEl);
+
+    // Directional Arrow for directed links
+    if (isDir) {
+      const arrow = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      arrow.setAttribute("points", "-7,-5 7,0 -7,5");
+      arrow.setAttribute("fill", isNeg ? "#ef4444" : "#f59e0b");
+      arrow.setAttribute("stroke", "#050608");
+      arrow.setAttribute("stroke-width", "1");
+      arrow.setAttribute("transform", `translate(${arrowX}, ${arrowY}) rotate(${arrowAngle})`);
+      arrow.style.cursor = "pointer";
+      arrow.onclick = (e) => {
+        e.stopPropagation();
+        openLinkModal(l);
+      };
+      g.appendChild(arrow);
+    }
+
+    // Latency Badge
+    const badgeG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    badgeG.setAttribute("class", "link-badge");
+    badgeG.setAttribute("transform", `translate(${badgeX}, ${badgeY})`);
+
+    const badgeWidth = isDir ? 62 : 52;
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", -badgeWidth / 2);
+    rect.setAttribute("y", -10);
+    rect.setAttribute("width", badgeWidth);
+    rect.setAttribute("height", 20);
+
+    const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    const dirSymbol = isDir ? " →" : "";
+    txt.textContent = `${l.latency > 0 ? "" : ""}${Math.round(l.latency * 10) / 10}ms${dirSymbol}`;
+
+    if (isNeg) {
+      rect.setAttribute("stroke", "#dc2626");
+      rect.setAttribute("fill", "#2b0a0a");
+      txt.setAttribute("fill", "#fca5a5");
+    }
+
+    badgeG.appendChild(rect);
+    badgeG.appendChild(txt);
+    badgeG.onclick = (e) => {
+      e.stopPropagation();
+      openLinkModal(l);
+    };
+    g.appendChild(badgeG);
+
+    linksLayer.appendChild(g);
+  });
+
+  // 2. Render Server Nodes (Chips)
+  state.network.servers.forEach(s => {
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    let cls = "server-node";
+    if (s.id === state.selectedServerId) cls += " selected";
+    if (s.id === state.wireStartServerId) cls += " wire-source";
+    g.setAttribute("class", cls);
+    g.setAttribute("transform", `translate(${s.x}, ${s.y})`);
+
+    const width = 104;
+    const height = 54;
+    const hw = width / 2;
+    const hh = height / 2;
+
+    // Node Background Rect
+    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bg.setAttribute("class", "chip-bg");
+    bg.setAttribute("x", -hw);
+    bg.setAttribute("y", -hh);
+    bg.setAttribute("width", width);
+    bg.setAttribute("height", height);
+    bg.setAttribute("rx", 8);
+    bg.setAttribute("fill", "#0e1118");
+    bg.setAttribute("stroke", "#8b0000");
+    bg.setAttribute("stroke-width", "2");
+
+    // Server Name text
+    const nameTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    nameTxt.setAttribute("x", 0);
+    nameTxt.setAttribute("y", -8);
+    nameTxt.setAttribute("text-anchor", "middle");
+    nameTxt.setAttribute("fill", "#f8fafc");
+    nameTxt.setAttribute("font-size", "12px");
+    nameTxt.setAttribute("font-weight", "600");
+    nameTxt.textContent = s.name;
+
+    // Capacity Badge
+    const capTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    capTxt.setAttribute("x", 0);
+    capTxt.setAttribute("y", 10);
+    capTxt.setAttribute("text-anchor", "middle");
+    capTxt.setAttribute("fill", "#f87171");
+    capTxt.setAttribute("font-size", "10px");
+    capTxt.setAttribute("font-family", "monospace");
+    capTxt.textContent = `⚡ ${s.capacity} cap`;
+
+    // Attached Client indicator if any
+    const cDem = clientCounts[s.id];
+    if (cDem) {
+      const cTxt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      cTxt.setAttribute("x", hw - 6);
+      cTxt.setAttribute("y", -hh + 12);
+      cTxt.setAttribute("text-anchor", "end");
+      cTxt.setAttribute("fill", "#fbbf24");
+      cTxt.setAttribute("font-size", "9px");
+      cTxt.textContent = `👤${cDem}`;
+      g.appendChild(cTxt);
+    }
+
+    // 4 Pin Connector Dots (Logisim IC pins)
+    const pins = [
+      { cx: 0, cy: -hh }, // Top pin
+      { cx: 0, cy: hh },  // Bottom pin
+      { cx: -hw, cy: 0 }, // Left pin
+      { cx: hw, cy: 0 },  // Right pin
+    ];
+    pins.forEach(p => {
+      const pin = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      pin.setAttribute("class", "pin-dot");
+      pin.setAttribute("cx", p.cx);
+      pin.setAttribute("cy", p.cy);
+      pin.setAttribute("r", 3.5);
+      g.appendChild(pin);
+    });
+
+    g.appendChild(bg);
+    g.appendChild(nameTxt);
+    g.appendChild(capTxt);
+
+    // Node Interaction Events
+    g.onmousedown = (e) => onNodeMouseDown(e, s);
+    g.onclick = (e) => onNodeClick(e, s);
+    g.ondblclick = (e) => {
+      e.stopPropagation();
+      openServerModal(s);
+    };
+
+    nodesLayer.appendChild(g);
+  });
+}
+
+// =====================================================================
+// CANVAS INTERACTION HANDLERS (PAN, DRAG, WIRE)
+// =====================================================================
+
+function onNodeMouseDown(e, server) {
+  if (state.activeTool === 'move') {
+    e.stopPropagation();
+    state.draggingServerId = server.id;
+    state.hasActuallyDragged = false;
+    const pt = getSVGPoint(e);
+    state.dragOffset = { x: pt.x - server.x, y: pt.y - server.y };
+  }
+}
+
+function onNodeClick(e, server) {
+  e.stopPropagation();
+
+  if (state.activeTool === 'wire') {
+    if (state.wireStartServerId === null) {
+      // Step 1: Select start server
+      state.wireStartServerId = server.id;
+      tempWire.setAttribute("x1", server.x);
+      tempWire.setAttribute("y1", server.y);
+      tempWire.setAttribute("x2", server.x);
+      tempWire.setAttribute("y2", server.y);
+      tempWire.style.display = 'block';
+      statusHint.innerHTML = `Connecting wire from <b>${server.name}</b>. Now click <b>Server B</b> to link!`;
+      render();
+    } else if (state.wireStartServerId === server.id) {
+      // Clicked same node: deselect
+      state.wireStartServerId = null;
+      tempWire.style.display = 'none';
+      statusHint.innerHTML = "<b>Wire Mode:</b> Click Server A, then click Server B.";
+      render();
+    } else {
+      // Step 2: Connect from start to this server
+      const u = Math.min(state.wireStartServerId, server.id);
+      const v = Math.max(state.wireStartServerId, server.id);
+      const exists = state.network.links.some(l => l.u === u && l.v === v);
+      if (!exists) {
+        state.network.links.push({ u: u, v: v, latency: 18.0 });
+      }
+      state.wireStartServerId = null;
+      tempWire.style.display = 'none';
+      statusHint.innerHTML = "<b>Wire Connected!</b> Click another server pair or switch to Move mode.";
+      render();
+      if (!exists) {
+        notifyStreamlit();
+      }
+    }
+  } else if (state.activeTool === 'delete') {
+    // Delete server and all its incident links & clients
+    state.network.servers = state.network.servers.filter(s => s.id !== server.id);
+    state.network.links = state.network.links.filter(l => l.u !== server.id && l.v !== server.id);
+    state.network.clients = state.network.clients.filter(c => c.server_id !== server.id);
+    render();
+    notifyStreamlit();
+  } else if (state.activeTool === 'move') {
+    state.selectedServerId = server.id;
+    render();
+  }
+}
+
+// Background Mouse Down for Panning
+gridBg.onmousedown = (e) => {
+  if (state.activeTool === 'move' || e.button === 1 || e.shiftKey || e.spaceKey) {
+    state.isPanning = true;
+    state.panStart = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+    svg.style.cursor = 'grabbing';
+  }
+};
+
+// Window-wide Mouse Move (Ensures wire strictly locks to mouse tip without lag)
+window.addEventListener('mousemove', (e) => {
+  // Panning canvas
+  if (state.isPanning) {
+    transform.x = e.clientX - state.panStart.x;
+    transform.y = e.clientY - state.panStart.y;
+    updateTransform();
+    return;
+  }
+
+  // Active rubberband wire tracks mouse tip with 100% precision
+  if (state.wireStartServerId !== null) {
+    const pt = getSVGPoint(e);
+    tempWire.setAttribute("x2", pt.x);
+    tempWire.setAttribute("y2", pt.y);
+  }
+
+  // Dragging server node
+  if (state.draggingServerId !== null) {
+    state.hasActuallyDragged = true;
+    const pt = getSVGPoint(e);
+    const s = state.network.servers.find(srv => srv.id === state.draggingServerId);
+    if (s) {
+      // 8px subtle grid snapping
+      s.x = Math.round((pt.x - state.dragOffset.x) / 8) * 8;
+      s.y = Math.round((pt.y - state.dragOffset.y) / 8) * 8;
+      render();
+    }
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (state.isPanning) {
+    state.isPanning = false;
+    svg.style.cursor = state.activeTool === 'move' ? 'default' : (state.activeTool === 'wire' ? 'pointer' : 'crosshair');
+  }
+  if (state.draggingServerId !== null) {
+    if (state.hasActuallyDragged) {
+      notifyStreamlit();
+    }
+    state.draggingServerId = null;
+    state.hasActuallyDragged = false;
+  }
+});
+
+// Canvas Background Click for adding server or clearing wire
+gridBg.onclick = (e) => {
+  if (state.activeTool === 'add_server') {
+    const pt = getSVGPoint(e);
+    const nextId = (state.network.servers.length > 0)
+      ? Math.max(...state.network.servers.map(s => s.id)) + 1
+      : 0;
+    
+    // Snap to 12px grid
+    const sx = Math.round(pt.x / 12) * 12;
+    const sy = Math.round(pt.y / 12) * 12;
+
+    state.network.servers.push({
+      id: nextId,
+      name: `Server-${nextId + 1}`,
+      capacity: 50,
+      x: sx,
+      y: sy
+    });
+    render();
+    notifyStreamlit();
+  } else if (state.activeTool === 'wire' && state.wireStartServerId !== null) {
+    state.wireStartServerId = null;
+    tempWire.style.display = 'none';
+    render();
+  } else {
+    state.selectedServerId = null;
+    render();
+  }
+};
+
+// =====================================================================
+// MODAL DIALOGS (EDIT SERVER & LINK)
+// =====================================================================
+
+const modal = document.getElementById('edit-modal');
+const modalFields = document.getElementById('modal-fields');
+const modalTitleText = document.getElementById('modal-title-text');
+const modalBtnSave = document.getElementById('modal-btn-save');
+const modalBtnDel = document.getElementById('modal-btn-del');
+const modalBtnCancel = document.getElementById('modal-btn-cancel');
+const modalClose = document.getElementById('modal-close');
+
+function closeModal() {
+  modal.style.display = 'none';
+  state.modalContext = null;
+}
+modalBtnCancel.onclick = closeModal;
+modalClose.onclick = closeModal;
+modal.onclick = (e) => {
+  if (e.target === modal) closeModal();
+};
+
+function openServerModal(server) {
+  state.modalContext = { type: 'server', id: server.id };
+  modalTitleText.textContent = `Edit Server: ${server.name}`;
+  modalFields.innerHTML = `
+    <div class="modal-field">
+      <label>Server Name / City:</label>
+      <input type="text" class="modal-input" id="inp-s-name" value="${server.name}">
+    </div>
+    <div class="modal-field">
+      <label>Compute Capacity (units):</label>
+      <input type="number" class="modal-input" id="inp-s-cap" min="5" max="100" step="5" value="${server.capacity}">
+    </div>
+  `;
+  modalBtnDel.style.display = 'inline-block';
+  modal.style.display = 'flex';
+
+  setTimeout(() => {
+    const nameInp = document.getElementById('inp-s-name');
+    if (nameInp) {
+      nameInp.focus();
+      nameInp.select();
+      nameInp.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); modalBtnSave.click(); }
+        if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+      };
+    }
+    const capInp = document.getElementById('inp-s-cap');
+    if (capInp) {
+      capInp.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); modalBtnSave.click(); }
+        if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+      };
+    }
+  }, 40);
+}
+
+function openLinkModal(link) {
+  state.modalContext = { type: 'link', link: link };
+  const sMap = {};
+  state.network.servers.forEach(s => { sMap[s.id] = s; });
+  const uName = sMap[link.u] ? sMap[link.u].name : link.u;
+  const vName = sMap[link.v] ? sMap[link.v].name : link.v;
+
+  const isDirected = !!link.directed;
+  modalTitleText.textContent = `Edit Link: ${uName} ${isDirected ? '→' : '↔'} ${vName}`;
+  modalFields.innerHTML = `
+    <div class="modal-field">
+      <label>Link Direction:</label>
+      <select class="modal-input" id="inp-l-dir">
+        <option value="two-way" ${!isDirected ? 'selected' : ''}>Two-way (Bidirectional ↔)</option>
+        <option value="forward" ${isDirected ? 'selected' : ''}>One-way (${uName} → ${vName})</option>
+        <option value="reverse">One-way (${vName} → ${uName})</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Net Cost / Latency (ms):</label>
+      <input type="number" class="modal-input" id="inp-l-lat" step="1" value="${link.latency}">
+    </div>
+    <div style="background: #11141c; border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-top: 6px;">
+      <p style="font-size: 0.72rem; color: #94a3b8; line-height: 1.3;">
+        ℹ️ <b>Net cost:</b> Latency minus bandwidth credit. Negative weights are allowed <b>ONLY on one-way (directed)</b> edges.
+      </p>
+    </div>
+    <div id="link-modal-error" style="display: none; color: #ef4444; font-size: 0.75rem; margin-top: 6px; font-weight: 600;"></div>
+  `;
+  modalBtnDel.style.display = 'inline-block';
+  modal.style.display = 'flex';
+
+  setTimeout(() => {
+    const latInp = document.getElementById('inp-l-lat');
+    if (latInp) {
+      latInp.focus();
+      latInp.select();
+      latInp.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); modalBtnSave.click(); }
+        if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
+      };
+    }
+  }, 40);
+}
+
+modalBtnSave.onclick = () => {
+  if (!state.modalContext) return;
+  if (state.modalContext.type === 'server') {
+    const s = state.network.servers.find(srv => srv.id === state.modalContext.id);
+    if (s) {
+      const nameInp = document.getElementById('inp-s-name').value.trim();
+      const capInp = parseInt(document.getElementById('inp-s-cap').value, 10);
+      if (nameInp) s.name = nameInp;
+      if (!isNaN(capInp) && capInp > 0) s.capacity = capInp;
+    }
+  } else if (state.modalContext.type === 'link') {
+    const l = state.modalContext.link;
+    if (l) {
+      const dirVal = document.getElementById('inp-l-dir').value;
+      const latInp = parseFloat(document.getElementById('inp-l-lat').value);
+      const errBox = document.getElementById('link-modal-error');
+
+      if (isNaN(latInp)) {
+        if (errBox) { errBox.textContent = "Please enter a valid net cost."; errBox.style.display = 'block'; }
+        return;
+      }
+
+      if (latInp < 0 && dirVal === 'two-way') {
+        const msg = "A negative undirected edge is an automatic negative cycle. Make it one-way.";
+        if (errBox) {
+          errBox.textContent = msg;
+          errBox.style.display = 'block';
+        } else {
+          alert(msg);
+        }
+        return;
+      }
+
+      const origU = l.u;
+      const origV = l.v;
+      l.latency = Math.round(latInp * 10) / 10;
+      if (dirVal === 'two-way') {
+        l.directed = false;
+      } else if (dirVal === 'forward') {
+        l.directed = true;
+      } else if (dirVal === 'reverse') {
+        l.directed = true;
+        l.u = origV;
+        l.v = origU;
+      }
+    }
+  }
+  closeModal();
+  render();
+  notifyStreamlit(true);
+};
+
+modalBtnDel.onclick = () => {
+  if (!state.modalContext) return;
+  if (state.modalContext.type === 'server') {
+    const sid = state.modalContext.id;
+    state.network.servers = state.network.servers.filter(s => s.id !== sid);
+    state.network.links = state.network.links.filter(l => l.u !== sid && l.v !== sid);
+    state.network.clients = state.network.clients.filter(c => c.server_id !== sid);
+  } else if (state.modalContext.type === 'link') {
+    const targetLink = state.modalContext.link;
+    state.network.links = state.network.links.filter(l => l !== targetLink);
+  }
+  closeModal();
+  render();
+  notifyStreamlit(true);
+};
+
+// =====================================================================
+// STREAMLIT COMPONENT PROTOCOL (BIDIRECTIONAL SYNC)
+// =====================================================================
+
+let notifyTimer = null;
+function notifyStreamlit(immediate = false) {
+  if (notifyTimer) {
+    clearTimeout(notifyTimer);
+    notifyTimer = null;
+  }
+  if (state.isCustomFullscreen) {
+    setParentIframeFullscreen(true);
+  }
+  const send = () => {
+    if (state.isCustomFullscreen) {
+      setParentIframeFullscreen(true);
+    }
+    const payload = {
+      servers: state.network.servers,
+      links: state.network.links,
+      clients: state.network.clients,
+      timestamp: Date.now()
+    };
+    window.parent.postMessage({
+      isStreamlitMessage: true,
+      type: "streamlit:setComponentValue",
+      value: payload
+    }, "*");
+  };
+  if (immediate) {
+    send();
+  } else {
+    notifyTimer = setTimeout(send, 250);
+  }
+}
+
+function setFrameHeight(height) {
+  if (state.isCustomFullscreen || !!document.fullscreenElement) return;
+  window.parent.postMessage({
+    isStreamlitMessage: true,
+    type: "streamlit:setFrameHeight",
+    height: height
+  }, "*");
+}
+
+// Tell Streamlit component is ready
+ensureParentFullscreenStyles();
+window.parent.postMessage({
+  isStreamlitMessage: true,
+  type: "streamlit:componentReady",
+  apiVersion: 1
+}, "*");
+if (!state.isCustomFullscreen && !document.fullscreenElement) {
+  setFrameHeight(660);
+}
+
+// Receive Render Data from Streamlit
+window.addEventListener("message", (event) => {
+  if (event.data.type === "streamlit:render") {
+    if (state.isCustomFullscreen) {
+      setParentIframeFullscreen(true);
+    }
+    const args = event.data.args;
+    if (args && args.network_data) {
+      const net = args.network_data;
+      if (state.network.servers.length === 0 || args.force_reload) {
+        state.network = {
+          servers: net.servers || [],
+          links: net.links || [],
+          clients: net.clients || []
+        };
+        render();
+      }
+    }
+  }
+});
+
+</script>
+</body>
+</html>
